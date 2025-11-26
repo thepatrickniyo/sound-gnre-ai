@@ -98,3 +98,6 @@ poetry.lock
 
 # Documentation
 FEATURES_EXTRACTION.md
+./report
+report
+generate_report.py

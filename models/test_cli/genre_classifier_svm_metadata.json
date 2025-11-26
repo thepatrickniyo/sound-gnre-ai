@@ -1,0 +1,12 @@
+{
+  "model_type": "svm",
+  "training_date": "2025-11-26T21:31:15.004977",
+  "train_accuracy": 0.9172932330827067,
+  "cv_mean": null,
+  "cv_std": null,
+  "n_samples": 532,
+  "n_features": 57,
+  "n_classes": 10,
+  "version": "test_cli",
+  "model_path": "models/test_cli/genre_classifier_svm.pkl"
+}
