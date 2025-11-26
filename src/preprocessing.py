@@ -15,7 +15,15 @@ import numpy as np
 from pathlib import Path
 from typing import Tuple, Dict, List, Optional
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 import librosa
+import joblib
+import json
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(
@@ -404,6 +412,382 @@ class DataAcquisition:
         logger.info("=" * 60)
         
         return results
+
+
+class DataProcessor:
+    """
+    Data Processing Pipeline class for cleaning, transforming, and preparing data for ML.
+    """
+    
+    def __init__(self, models_dir: str = "models"):
+        """
+        Initialize DataProcessor.
+        
+        Args:
+            models_dir: Directory to save encoders and scalers
+        """
+        self.models_dir = Path(models_dir)
+        self.models_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.label_encoder = LabelEncoder()
+        self.scaler = StandardScaler()
+        
+        self.feature_columns = None
+        self.is_fitted = False
+        
+        logger.info(f"Initialized DataProcessor with models_dir: {self.models_dir}")
+    
+    def clean_data(self, df: pd.DataFrame, 
+                   handle_missing: str = 'drop',
+                   remove_outliers: bool = True,
+                   outlier_method: str = 'iqr',
+                   outlier_threshold: float = 3.0) -> pd.DataFrame:
+        """
+        Clean the dataset by handling missing values and outliers.
+        
+        Args:
+            df: DataFrame to clean
+            handle_missing: Strategy for missing values ('drop', 'mean', 'median', 'mode')
+            remove_outliers: Whether to remove outliers
+            outlier_method: Method for outlier detection ('iqr', 'zscore')
+            outlier_threshold: Threshold for outlier detection
+            
+        Returns:
+            Cleaned DataFrame
+        """
+        logger.info("Starting data cleaning...")
+        original_size = len(df)
+        df_cleaned = df.copy()
+        
+        # Handle missing values
+        missing_before = df_cleaned.isnull().sum().sum()
+        if missing_before > 0:
+            logger.info(f"Found {missing_before} missing values")
+            
+            if handle_missing == 'drop':
+                df_cleaned = df_cleaned.dropna()
+                logger.info(f"Dropped rows with missing values: {len(df) - len(df_cleaned)} rows")
+            elif handle_missing == 'mean':
+                numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+                df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+                logger.info("Filled missing values with mean")
+            elif handle_missing == 'median':
+                numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+                df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+                logger.info("Filled missing values with median")
+            elif handle_missing == 'mode':
+                for col in df_cleaned.columns:
+                    df_cleaned[col].fillna(df_cleaned[col].mode()[0], inplace=True)
+                logger.info("Filled missing values with mode")
+        
+        # Remove outliers
+        if remove_outliers and 'label' in df_cleaned.columns:
+            # Get feature columns (exclude metadata columns)
+            exclude_cols = ['filename', 'label', 'length']
+            feature_cols = [col for col in df_cleaned.columns if col not in exclude_cols]
+            
+            if feature_cols:
+                if outlier_method == 'iqr':
+                    # IQR method
+                    Q1 = df_cleaned[feature_cols].quantile(0.25)
+                    Q3 = df_cleaned[feature_cols].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - outlier_threshold * IQR
+                    upper_bound = Q3 + outlier_threshold * IQR
+                    
+                    # Remove outliers
+                    mask = ((df_cleaned[feature_cols] >= lower_bound) & 
+                           (df_cleaned[feature_cols] <= upper_bound)).all(axis=1)
+                    outliers_removed = len(df_cleaned) - mask.sum()
+                    df_cleaned = df_cleaned[mask]
+                    
+                    logger.info(f"Removed {outliers_removed} outliers using IQR method")
+                
+                elif outlier_method == 'zscore':
+                    # Z-score method
+                    if not SCIPY_AVAILABLE:
+                        raise ImportError("scipy is required for zscore outlier detection. Install with: pip install scipy")
+                    z_scores = np.abs(stats.zscore(df_cleaned[feature_cols]))
+                    mask = (z_scores < outlier_threshold).all(axis=1)
+                    outliers_removed = len(df_cleaned) - mask.sum()
+                    df_cleaned = df_cleaned[mask]
+                    
+                    logger.info(f"Removed {outliers_removed} outliers using Z-score method")
+        
+        final_size = len(df_cleaned)
+        logger.info(f"Data cleaning completed: {original_size} -> {final_size} samples")
+        
+        return df_cleaned
+    
+    def encode_labels(self, labels: pd.Series, fit: bool = True) -> np.ndarray:
+        """
+        Encode genre labels to integers.
+        
+        Args:
+            labels: Series of genre labels (strings)
+            fit: Whether to fit the encoder (True for training, False for test)
+            
+        Returns:
+            Encoded labels as numpy array
+        """
+        if fit:
+            encoded = self.label_encoder.fit_transform(labels)
+            logger.info(f"Fitted label encoder with {len(self.label_encoder.classes_)} classes")
+            label_mapping = dict(zip(self.label_encoder.classes_, 
+                                    self.label_encoder.transform(self.label_encoder.classes_)))
+            logger.info(f"Label mapping: {label_mapping}")
+        else:
+            encoded = self.label_encoder.transform(labels)
+            logger.info(f"Transformed {len(labels)} labels using fitted encoder")
+        
+        return encoded
+    
+    def get_feature_columns(self, df: pd.DataFrame, 
+                           exclude_columns: Optional[List[str]] = None) -> List[str]:
+        """
+        Get list of feature columns (excluding metadata).
+        
+        Args:
+            df: DataFrame
+            exclude_columns: Columns to exclude from features
+            
+        Returns:
+            List of feature column names
+        """
+        if exclude_columns is None:
+            exclude_columns = ['filename', 'label', 'length']
+        
+        feature_columns = [col for col in df.columns if col not in exclude_columns]
+        return feature_columns
+    
+    def prepare_features_and_labels(self, df: pd.DataFrame,
+                                   exclude_columns: Optional[List[str]] = None) -> Tuple[pd.DataFrame, pd.Series]:
+        """
+        Separate features and labels from DataFrame.
+        
+        Args:
+            df: DataFrame with features and labels
+            exclude_columns: Columns to exclude from features
+            
+        Returns:
+            Tuple of (features_df, labels_series)
+        """
+        if exclude_columns is None:
+            exclude_columns = ['filename', 'label', 'length']
+        
+        if 'label' not in df.columns:
+            raise ValueError("DataFrame must contain 'label' column")
+        
+        # Get feature columns
+        self.feature_columns = self.get_feature_columns(df, exclude_columns)
+        
+        # Separate features and labels
+        features_df = df[self.feature_columns].copy()
+        labels_series = df['label'].copy()
+        
+        logger.info(f"Prepared {len(self.feature_columns)} features and {len(labels_series)} labels")
+        
+        return features_df, labels_series
+    
+    def fit_scaler(self, features_df: pd.DataFrame) -> StandardScaler:
+        """
+        Fit StandardScaler on feature data.
+        
+        Args:
+            features_df: DataFrame with features
+            
+        Returns:
+            Fitted StandardScaler
+        """
+        logger.info("Fitting StandardScaler on features...")
+        self.scaler.fit(features_df)
+        self.is_fitted = True
+        logger.info("Scaler fitted successfully")
+        return self.scaler
+    
+    def transform_features(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transform features using fitted scaler.
+        
+        Args:
+            features_df: DataFrame with features to transform
+            
+        Returns:
+            DataFrame with scaled features
+        """
+        if not self.is_fitted:
+            raise ValueError("Scaler not fitted. Call fit_scaler() first.")
+        
+        logger.info("Transforming features...")
+        scaled_features = self.scaler.transform(features_df)
+        scaled_df = pd.DataFrame(scaled_features, columns=features_df.columns, index=features_df.index)
+        logger.info("Features transformed successfully")
+        return scaled_df
+    
+    def fit_transform_features(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Fit scaler and transform features in one step.
+        
+        Args:
+            features_df: DataFrame with features
+            
+        Returns:
+            DataFrame with scaled features
+        """
+        self.fit_scaler(features_df)
+        return self.transform_features(features_df)
+    
+    def process_training_data(self, train_df: pd.DataFrame,
+                             clean_data: bool = True,
+                             remove_outliers: bool = True) -> Tuple[np.ndarray, np.ndarray, Dict]:
+        """
+        Complete processing pipeline for training data.
+        
+        Args:
+            train_df: Training DataFrame
+            clean_data: Whether to clean data
+            remove_outliers: Whether to remove outliers
+            
+        Returns:
+            Tuple of (X_train, y_train, metadata_dict)
+        """
+        logger.info("=" * 60)
+        logger.info("Processing Training Data")
+        logger.info("=" * 60)
+        
+        # Clean data
+        if clean_data:
+            train_df = self.clean_data(train_df, remove_outliers=remove_outliers)
+        
+        # Prepare features and labels
+        X_train_df, y_train_series = self.prepare_features_and_labels(train_df)
+        
+        # Encode labels
+        y_train = self.encode_labels(y_train_series, fit=True)
+        
+        # Scale features
+        X_train_scaled = self.fit_transform_features(X_train_df)
+        X_train = X_train_scaled.values
+        
+        # Metadata
+        metadata = {
+            'n_samples': len(X_train),
+            'n_features': len(self.feature_columns),
+            'n_classes': len(self.label_encoder.classes_),
+            'class_names': self.label_encoder.classes_.tolist(),
+            'feature_names': self.feature_columns
+        }
+        
+        logger.info(f"Training data processed: {metadata['n_samples']} samples, "
+                   f"{metadata['n_features']} features, {metadata['n_classes']} classes")
+        logger.info("=" * 60)
+        
+        return X_train, y_train, metadata
+    
+    def process_test_data(self, test_df: pd.DataFrame,
+                         clean_data: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Complete processing pipeline for test data (using fitted transformers).
+        
+        Args:
+            test_df: Test DataFrame
+            clean_data: Whether to clean data
+            
+        Returns:
+            Tuple of (X_test, y_test)
+        """
+        if not self.is_fitted:
+            raise ValueError("Processor not fitted. Call process_training_data() first.")
+        
+        logger.info("=" * 60)
+        logger.info("Processing Test Data")
+        logger.info("=" * 60)
+        
+        # Clean data (without removing outliers to preserve test set integrity)
+        if clean_data:
+            test_df = self.clean_data(test_df, remove_outliers=False)
+        
+        # Prepare features and labels
+        X_test_df, y_test_series = self.prepare_features_and_labels(test_df)
+        
+        # Encode labels (using fitted encoder)
+        y_test = self.encode_labels(y_test_series, fit=False)
+        
+        # Transform features (using fitted scaler)
+        X_test_scaled = self.transform_features(X_test_df)
+        X_test = X_test_scaled.values
+        
+        logger.info(f"Test data processed: {len(X_test)} samples")
+        logger.info("=" * 60)
+        
+        return X_test, y_test
+    
+    def save_processor(self, prefix: str = "data_processor") -> None:
+        """
+        Save label encoder, scaler, and metadata.
+        
+        Args:
+            prefix: Prefix for saved files
+        """
+        if not self.is_fitted:
+            raise ValueError("Processor not fitted. Cannot save.")
+        
+        # Save label encoder
+        encoder_path = self.models_dir / f"{prefix}_label_encoder.pkl"
+        joblib.dump(self.label_encoder, encoder_path)
+        logger.info(f"Label encoder saved to {encoder_path}")
+        
+        # Save scaler
+        scaler_path = self.models_dir / f"{prefix}_scaler.pkl"
+        joblib.dump(self.scaler, scaler_path)
+        logger.info(f"Scaler saved to {scaler_path}")
+        
+        # Save metadata
+        metadata = {
+            'feature_columns': self.feature_columns,
+            'class_names': self.label_encoder.classes_.tolist(),
+            'n_classes': len(self.label_encoder.classes_),
+            'n_features': len(self.feature_columns) if self.feature_columns else 0
+        }
+        
+        metadata_path = self.models_dir / f"{prefix}_metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        logger.info(f"Metadata saved to {metadata_path}")
+    
+    def load_processor(self, prefix: str = "data_processor") -> None:
+        """
+        Load label encoder, scaler, and metadata.
+        
+        Args:
+            prefix: Prefix for saved files
+        """
+        # Load label encoder
+        encoder_path = self.models_dir / f"{prefix}_label_encoder.pkl"
+        if encoder_path.exists():
+            self.label_encoder = joblib.load(encoder_path)
+            logger.info(f"Label encoder loaded from {encoder_path}")
+        else:
+            raise FileNotFoundError(f"Label encoder not found: {encoder_path}")
+        
+        # Load scaler
+        scaler_path = self.models_dir / f"{prefix}_scaler.pkl"
+        if scaler_path.exists():
+            self.scaler = joblib.load(scaler_path)
+            self.is_fitted = True
+            logger.info(f"Scaler loaded from {scaler_path}")
+        else:
+            raise FileNotFoundError(f"Scaler not found: {scaler_path}")
+        
+        # Load metadata
+        metadata_path = self.models_dir / f"{prefix}_metadata.json"
+        if metadata_path.exists():
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            self.feature_columns = metadata['feature_columns']
+            logger.info(f"Metadata loaded from {metadata_path}")
+        else:
+            logger.warning(f"Metadata not found: {metadata_path}")
 
 
 def main():
