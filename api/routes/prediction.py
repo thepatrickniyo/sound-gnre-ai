@@ -44,21 +44,27 @@ def load_model():
         _processor = DataProcessor(models_dir="models")
         _processor.load_processor()
         
-        # Get class names from metadata
-        metadata_file = model_file.parent / f"genre_classifier_{model_type}_metadata.json"
-        if metadata_file.exists():
-            import json
-            with open(metadata_file, 'r') as f:
-                metadata = json.load(f)
-            _class_names = metadata.get('class_names', [])
+        # Get class names from label encoder (most reliable source)
+        if _processor.label_encoder and hasattr(_processor.label_encoder, 'classes_'):
+            _class_names = _processor.label_encoder.classes_.tolist()
         else:
-            # Try to get from processor metadata
-            metadata_path = Path("models/data_processor_metadata.json")
-            if metadata_path.exists():
+            # Fallback: Try to get from model metadata
+            metadata_file = model_file.parent / f"genre_classifier_{model_type}_metadata.json"
+            if metadata_file.exists():
                 import json
-                with open(metadata_path, 'r') as f:
+                with open(metadata_file, 'r') as f:
                     metadata = json.load(f)
                 _class_names = metadata.get('class_names', [])
+            else:
+                # Try to get from processor metadata
+                metadata_path = Path("models/data_processor_metadata.json")
+                if metadata_path.exists():
+                    import json
+                    with open(metadata_path, 'r') as f:
+                        metadata = json.load(f)
+                    _class_names = metadata.get('class_names', [])
+                else:
+                    _class_names = None
         
         return True
     except Exception as e:
