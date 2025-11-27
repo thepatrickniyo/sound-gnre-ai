@@ -10,6 +10,12 @@ import sys
 import os
 from pathlib import Path
 
+# Get project root (parent of scripts folder)
+project_root = Path(__file__).parent.parent
+
+# Change to project root directory so relative paths work
+os.chdir(project_root)
+
 def check_python_version():
     """Check if Python version is 3.8 or higher."""
     version = sys.version_info
@@ -56,7 +62,7 @@ def check_project_structure():
     
     all_good = True
     for path_str, description in required_paths.items():
-        path = Path(path_str)
+        path = project_root / path_str
         if path.exists():
             print(f"✓ {description}: {path_str}")
         else:
@@ -70,7 +76,7 @@ def check_directories():
     required_dirs = ['data/train', 'data/test']
     
     for dir_path in required_dirs:
-        path = Path(dir_path)
+        path = project_root / dir_path
         path.mkdir(parents=True, exist_ok=True)
         if path.exists():
             print(f"✓ Directory ready: {dir_path}")

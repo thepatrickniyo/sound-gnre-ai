@@ -3,6 +3,14 @@ Prediction Page for Music Genre Classification
 
 Allows users to upload audio files or record audio and get genre predictions.
 """
+import sys
+from pathlib import Path
+
+# Add project root to Python path for imports
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 import streamlit as st
 import io
 import time

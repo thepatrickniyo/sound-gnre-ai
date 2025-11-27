@@ -8,6 +8,19 @@ This script shows how to:
 3. Rollback to previous versions
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Get project root (go up one level from scripts folder)
+project_root = Path(__file__).parent.parent
+
+# Add project root to Python path so imports work
+sys.path.insert(0, str(project_root))
+
+# Change to project root directory so relative paths work
+os.chdir(project_root)
+
 from src.retraining import ModelRetrainer
 import pandas as pd
 

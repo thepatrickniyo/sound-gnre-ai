@@ -3,8 +3,15 @@ Upload Data Page for Music Genre Classification
 
 Allows users to upload multiple audio files for training.
 """
-import streamlit as st
+import sys
 from pathlib import Path
+
+# Add project root to Python path for imports
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+import streamlit as st
 import time
 
 from ui.utils.api_client import get_api_client
