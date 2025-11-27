@@ -31,12 +31,7 @@ st.title("Music Genre Prediction")
 st.markdown("Upload an audio file to predict its genre.")
 
 # Initialize API client
-api_base_url = st.sidebar.text_input(
-    "API Base URL",
-    value="http://localhost:8000",
-    help="Base URL of the FastAPI server"
-)
-api_client = get_api_client(api_base_url)
+api_client = get_api_client()
 
 # Check API connection
 health = api_client.health_check()
@@ -174,7 +169,6 @@ if audio_data is not None:
                 st.error("Failed to make prediction. Please check the API connection and try again.")
 
 # Sidebar information
-st.sidebar.markdown("---")
 st.sidebar.header("Information")
 st.sidebar.info(
     """

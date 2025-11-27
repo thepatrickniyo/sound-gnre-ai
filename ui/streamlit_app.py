@@ -59,12 +59,7 @@ def main():
     st.markdown("---")
     
     # Initialize API client
-    api_base_url = st.sidebar.text_input(
-        "API Base URL",
-        value="http://localhost:8000",
-        help="Base URL of the FastAPI server"
-    )
-    api_client = get_api_client(api_base_url)
+    api_client = get_api_client()
     
     # Sidebar navigation
     st.sidebar.title("Navigation")

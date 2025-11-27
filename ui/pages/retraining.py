@@ -28,12 +28,7 @@ st.title("Model Retraining")
 st.markdown("Retrain the model with new data to improve performance.")
 
 # Initialize API client
-api_base_url = st.sidebar.text_input(
-    "API Base URL",
-    value="http://localhost:8000",
-    help="Base URL of the FastAPI server"
-)
-api_client = get_api_client(api_base_url)
+api_client = get_api_client()
 
 # Check API connection
 health = api_client.health_check()
@@ -256,7 +251,6 @@ if st.button("Refresh Job List"):
         st.warning("Could not retrieve training jobs.")
 
 # Sidebar information
-st.sidebar.markdown("---")
 st.sidebar.header("Information")
 st.sidebar.info(
     """

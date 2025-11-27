@@ -28,12 +28,7 @@ st.title("Upload Training Data")
 st.markdown("Upload audio files to be used for model training or retraining.")
 
 # Initialize API client
-api_base_url = st.sidebar.text_input(
-    "API Base URL",
-    value="http://localhost:8000",
-    help="Base URL of the FastAPI server"
-)
-api_client = get_api_client(api_base_url)
+api_client = get_api_client()
 
 # Check API connection
 health = api_client.health_check()
@@ -215,7 +210,6 @@ with col2:
     """)
 
 # Sidebar information
-st.sidebar.markdown("---")
 st.sidebar.header("Information")
 st.sidebar.info(
     """
