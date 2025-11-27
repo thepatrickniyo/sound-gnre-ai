@@ -1,0 +1,29 @@
+{
+  "retraining_date": "2025-11-27T22:30:54.572068",
+  "old_version": null,
+  "new_version": "v2_20251127_223054",
+  "model_type": "random_forest",
+  "data_info": {
+    "existing_samples": 800,
+    "new_samples": 18,
+    "combined_samples": 818,
+    "train_samples": 654,
+    "test_samples": 164
+  },
+  "metrics_comparison": {
+    "old": {
+      "train_accuracy": 1.0,
+      "test_accuracy": 0.6770186335403726,
+      "test_f1": 0.6759264075559716
+    },
+    "new": {
+      "train_accuracy": 0.9976635514018691,
+      "test_accuracy": 0.6402439024390244,
+      "test_f1": 0.6377030702328492
+    }
+  },
+  "improvement": {
+    "accuracy_change": -0.03677473110134821,
+    "f1_change": -0.03822333732312233
+  }
+}
