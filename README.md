@@ -579,22 +579,62 @@ The load tests collect comprehensive performance metrics:
 
 ### Results Location
 
-Test results are automatically saved to `load_testing/results/` directory:
+Test results are automatically saved to the `load_testing/results/` directory in the project root. This directory contains all load testing artifacts:
 
 ```
 load_testing/results/
+├── Locust Results.pdf                              # Comprehensive PDF report
+├── result-page1.png                                # Results visualization (Page 1)
+├── resulte-page2.png                               # Results visualization (Page 2)
+├── result-page3.png                                # Results visualization (Page 3)
 ├── load_test_10users_20251127_120000.html          # HTML report
-├── load_test_10users_20251127_120000_stats.csv     # Request statistics
-├── load_test_10users_20251127_120000_failures.csv  # Failed requests
-├── load_test_10users_20251127_120000_exceptions.csv # Exceptions
-└── load_test_10users_20251127_120000_summary.json  # Test summary
+├── load_test_10users_20251127_120000_stats.csv     # Request statistics (CSV)
+├── load_test_10users_20251127_120000_stats_history.csv # Historical stats (CSV)
+├── load_test_10users_20251127_120000_failures.csv  # Failed requests (CSV)
+├── load_test_10users_20251127_120000_exceptions.csv # Exceptions (CSV)
+└── load_test_10users_20251127_120000_summary.json  # Test summary (JSON)
 ```
+
+**Location in Repository:**
+- Results directory: `load_testing/results/`
+- PDF Report: `load_testing/results/Locust Results.pdf`
+- CSV Data: `load_testing/results/*.csv` files
+- Visualizations: `load_testing/results/result-page*.png` files
 
 ### Viewing Results
 
-1. **HTML Report**: Open the `.html` file in your browser for a detailed visual report
-2. **CSV Files**: Import into Excel/Google Sheets for analysis
-3. **Summary JSON**: Machine-readable test summary
+Multiple formats are available for analyzing test results:
+
+1. **PDF Report** (`Locust Results.pdf`): Comprehensive document with detailed analysis, charts, and performance metrics
+2. **HTML Report** (`.html` files): Interactive web-based report - open in any browser for detailed visual analysis
+3. **CSV Files**: 
+   - `*_stats.csv` - Request statistics with percentiles
+   - `*_stats_history.csv` - Time-series data for trend analysis
+   - `*_failures.csv` - Details of any failed requests
+   - `*_exceptions.csv` - Exception logs
+   - Import into Excel, Google Sheets, or Python pandas for custom analysis
+4. **Summary JSON**: Machine-readable test summary for programmatic access
+5. **PNG Images**: Visual charts and graphs showing performance metrics
+
+### Load Test Results Visualization
+
+The following images show detailed performance metrics from actual load test runs:
+
+**Results Overview - Page 1:**
+![Load Test Results Page 1](https://github.com/thepatrickniyo/sound-gnre-ai/blob/master/load_testing/results/result-page1.png?raw=true)
+
+**Results Overview - Page 2:**
+![Load Test Results Page 2](https://github.com/thepatrickniyo/sound-gnre-ai/blob/master/load_testing/results/resulte-page2.png?raw=true)
+
+**Results Overview - Page 3:**
+![Load Test Results Page 3](https://github.com/thepatrickniyo/sound-gnre-ai/blob/master/load_testing/results/result-page3.png?raw=true)
+
+These visualizations include:
+- Response time distributions
+- Requests per second over time
+- Endpoint performance comparisons
+- Failure rates and error analysis
+- Percentile breakdowns (p50, p95, p99)
 
 ### Example Results
 
@@ -647,8 +687,10 @@ Here are results from a recent load test run (10 concurrent users, 30 seconds du
 - **Reliability**: 100% success rate under load
 
 **View Detailed Results:**
-- HTML Report: `load_testing/results/load_test_10users_20251127_231541.html`
-- CSV Statistics: `load_testing/results/load_test_10users_20251127_231541_stats.csv`
+- **PDF Report**: `load_testing/results/Locust Results.pdf` - Comprehensive analysis document
+- **HTML Report**: `load_testing/results/load_test_10users_20251127_231541.html` - Interactive web report
+- **CSV Statistics**: `load_testing/results/load_test_10users_20251127_231541_stats.csv` - Raw data for analysis
+- **Visual Charts**: `load_testing/results/result-page*.png` - Performance visualization images
 
 ### Performance Benchmarks
 
