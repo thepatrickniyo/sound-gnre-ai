@@ -497,42 +497,188 @@ classifier.save('models/my_model.pkl')
 
 ## Flood Request Simulation
 
-Load testing is performed using **Locust** to evaluate API performance under various load conditions.
+Load testing is performed using **Locust** to evaluate API performance under various load conditions. The system includes a complete load testing infrastructure that you can run to test your API's performance.
 
-### Load Testing Setup
+### Prerequisites
 
-The system supports load testing with different container configurations:
-- 1 container
-- 2 containers
-- 4 containers
-- 8 containers
+Ensure Locust is installed:
+```bash
+pip install locust
+```
 
-### Metrics Measured
-
-- **Response Time**: p50, p95, p99 percentiles
-- **Latency**: Average and maximum latency
-- **Throughput**: Requests per second (RPS)
-- **Error Rate**: Percentage of failed requests
+Or install all dependencies:
+```bash
+pip install -r requirements.txt
+```
 
 ### Running Load Tests
 
-```bash
-# Install Locust
-pip install locust
+#### Quick Start
 
-# Run Locust (if locustfile.py exists)
+1. **Start the API** (in one terminal):
+```bash
+python scripts/run_api.py
+# API should be running at http://localhost:8000
+```
+
+2. **Run Load Test** (in another terminal):
+```bash
+# Basic test with default settings (10 users, 2m duration)
+python load_testing/run_load_test.py
+
+# Or use the convenience script
+python scripts/run_load_test.py
+```
+
+#### Custom Test Configuration
+
+```bash
+# Test with 50 concurrent users, spawn 5 per second, run for 5 minutes
+python load_testing/run_load_test.py --users 50 --spawn-rate 5 --run-time 5m
+
+# Test with 100 users for 10 minutes
+python load_testing/run_load_test.py --users 100 --spawn-rate 10 --run-time 10m
+
+# Test with interactive web UI
+python load_testing/run_load_test.py --ui
+
+# Test against a different host
+python load_testing/run_load_test.py --host http://localhost:8000
+```
+
+#### Using Locust Web UI
+
+For interactive testing with real-time charts:
+```bash
 locust -f load_testing/locustfile.py --host=http://localhost:8000
 ```
 
-### Expected Results
+Then open your browser to `http://localhost:8089` to configure and monitor the test.
 
-Load testing results demonstrate:
-- **Scalability**: Performance improvements with multiple containers
-- **Response Times**: Sub-second response times for predictions
-- **Throughput**: High request handling capacity
-- **Reliability**: Low error rates under load
+### Test Scenarios
 
-*Note: Specific load testing results should be documented in the project's load testing reports.*
+The load test simulates realistic user behavior with weighted tasks:
+
+- **Health Check** (5x weight) - Most common request
+- **Predict Genre** (10x weight) - Main functionality, uploads audio files
+- **Model Status** (3x weight) - Status checks
+- **Get Metrics** (2x weight) - Performance metrics
+- **Get Stats** (1x weight) - API statistics
+
+### Metrics Measured
+
+The load tests collect comprehensive performance metrics:
+
+- **Response Time**: p50, p95, p99 percentiles
+- **Average Response Time**: Mean response time per endpoint
+- **Min/Max Response Time**: Response time boundaries
+- **Throughput**: Requests per second (RPS)
+- **Total Requests**: Number of requests sent
+- **Failure Rate**: Percentage of failed requests
+- **Response Times by Endpoint**: Per-endpoint performance breakdown
+
+### Results Location
+
+Test results are automatically saved to `load_testing/results/` directory:
+
+```
+load_testing/results/
+├── load_test_10users_20251127_120000.html          # HTML report
+├── load_test_10users_20251127_120000_stats.csv     # Request statistics
+├── load_test_10users_20251127_120000_failures.csv  # Failed requests
+├── load_test_10users_20251127_120000_exceptions.csv # Exceptions
+└── load_test_10users_20251127_120000_summary.json  # Test summary
+```
+
+### Viewing Results
+
+1. **HTML Report**: Open the `.html` file in your browser for a detailed visual report
+2. **CSV Files**: Import into Excel/Google Sheets for analysis
+3. **Summary JSON**: Machine-readable test summary
+
+### Example Results
+
+After running a load test, you'll see output like:
+
+```
+Type     Name            # reqs      # fails  |     Avg     Min     Max  Median  |   req/s  failures/s
+--------|--------------|-----------|---------|-----------|-------|-------|-------|--------|-----------
+GET      Health Check       1250         0(0.00%) |      45      12     156      42  |   10.42    0.00
+POST     Predict Genre      2500         0(0.00%) |    1250     890    3450    1200  |   20.83    0.00
+GET      Model Status        750         0(0.00%) |      38      15     120      35  |    6.25    0.00
+GET      Get Metrics         500         0(0.00%) |      42      18     145      40  |    4.17    0.00
+GET      Get Stats           250         0(0.00%) |      35      12     110      32  |    2.08    0.00
+--------|--------------|-----------|---------|-----------|-------|-------|-------|--------|-----------
+         Aggregated         5250         0(0.00%) |     285     890    3450     280  |   43.75    0.00
+```
+
+### Actual Test Results
+
+Here are results from a recent load test run (10 concurrent users, 30 seconds duration):
+
+**Test Configuration:**
+- Users: 10 concurrent users
+- Spawn Rate: 2 users/second
+- Duration: 30 seconds
+- Total Requests: 59
+
+**Performance Summary:**
+
+| Endpoint | Requests | Failures | Avg Response (ms) | Min (ms) | Max (ms) | Median (ms) | Requests/s |
+|----------|----------|----------|-------------------|----------|----------|-------------|------------|
+| Health Check | 16 | 0 (0.00%) | 1,175 | 3 | 4,129 | 640 | 0.64 |
+| Predict Genre | 21 | 0 (0.00%) | 3,689 | 1,027 | 5,132 | 3,700 | 0.84 |
+| Model Status | 11 | 0 (0.00%) | 1,277 | 11 | 4,130 | 960 | 0.44 |
+| Get Metrics | 7 | 0 (0.00%) | 1,190 | 149 | 2,909 | 750 | 0.28 |
+| Get Stats | 4 | 0 (0.00%) | 1,237 | 63 | 3,135 | 610 | 0.16 |
+| **Aggregated** | **59** | **0 (0.00%)** | **2,095** | **3** | **5,132** | **1,900** | **2.37** |
+
+**Response Time Percentiles (Aggregated):**
+- p50 (Median): 1,900 ms
+- p95: 5,000 ms
+- p99: 5,100 ms
+- p99.9: 5,100 ms
+
+**Key Findings:**
+- **Zero Failures**: All 59 requests completed successfully (0% failure rate)
+- **Throughput**: 2.37 requests per second average
+- **Predict Genre Performance**: Average 3.7 seconds per prediction (includes audio processing)
+- **Health/Monitoring Endpoints**: Sub-second response times for most requests
+- **Reliability**: 100% success rate under load
+
+**View Detailed Results:**
+- HTML Report: `load_testing/results/load_test_10users_20251127_231541.html`
+- CSV Statistics: `load_testing/results/load_test_10users_20251127_231541_stats.csv`
+
+### Performance Benchmarks
+
+Based on actual load test results, typical performance characteristics:
+
+- **Health Check**: ~1,175ms average (ranges from 3ms to 4,129ms)
+- **Predict Genre**: ~3,689ms average (1-5 seconds, depends on audio file size and feature extraction)
+- **Model Status**: ~1,277ms average (ranges from 11ms to 4,130ms)
+- **Metrics/Stats**: ~1,190-1,237ms average (ranges from 63ms to 3,135ms)
+
+**Note**: Response times can vary based on system load, audio file complexity, and concurrent request volume. The Predict Genre endpoint includes audio feature extraction which is computationally intensive.
+
+### Tips for Load Testing
+
+1. **Start Small**: Begin with 10-20 users to establish baseline
+2. **Gradual Ramp-up**: Increase users gradually to find breaking points
+3. **Monitor Resources**: Watch CPU, memory, and disk usage during tests
+4. **Test Different Scenarios**: Vary user counts, spawn rates, and durations
+5. **Compare Results**: Run tests before/after optimizations to measure improvements
+
+### Troubleshooting
+
+**Issue**: "No sample audio file found"
+- **Solution**: Ensure `data/dataset/genres_original/` contains audio files, or the test will skip prediction requests
+
+**Issue**: "Connection refused"
+- **Solution**: Make sure the API is running on the specified host/port
+
+**Issue**: "Locust not found"
+- **Solution**: Install Locust with `pip install locust`
 
 ---
 
@@ -559,9 +705,9 @@ Load testing results demonstrate:
 - `plotly` - Interactive visualizations
 - `matplotlib` / `seaborn` - Static visualizations
 
-### Testing
+### Testing & Load Testing
 - `pytest` - Unit testing
-- `locust` - Load testing
+- `locust` - Load testing framework
 
 ---
 
