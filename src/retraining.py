@@ -249,17 +249,33 @@ class ModelRetrainer:
                 logger.warning(f"Could not load existing training data: {e}")
         
         # Step 3: Load new data
+        explicit_new_df = None
+        used_uploaded_data = False
         if new_data_source is None:
-            # Check uploads directory
-            upload_files = list(self.uploads_dir.glob("*.csv"))
-            if upload_files:
-                new_data_source = upload_files[0]
-                logger.info(f"Found uploaded data: {new_data_source}")
+            upload_csv_files = sorted(
+                self.uploads_dir.glob("*.csv"),
+                key=lambda p: p.stat().st_mtime if p.exists() else 0,
+                reverse=True
+            )
+            if upload_csv_files:
+                new_data_source = upload_csv_files[0]
+                data_format = "csv"
+                logger.info(f"Found uploaded CSV data: {new_data_source}")
+                used_uploaded_data = True
             else:
-                raise ValueError("No new data provided and no uploaded data found")
+                audio_files = self._find_uploaded_audio_files()
+                if audio_files:
+                    logger.info(f"Found {len(audio_files)} uploaded audio files. Extracting features...")
+                    explicit_new_df = self._build_dataframe_from_audio_uploads(audio_files)
+                    used_uploaded_data = True
+                else:
+                    raise ValueError("No new data provided and no uploaded data found")
         
         logger.info("\n[Step 3/6] Loading new training data...")
-        new_df = self.load_new_data(new_data_source, data_format=data_format)
+        if explicit_new_df is not None:
+            new_df = explicit_new_df
+        else:
+            new_df = self.load_new_data(new_data_source, data_format=data_format)
         
         # Step 4: Combine datasets
         logger.info("\n[Step 4/6] Combining datasets...")
@@ -359,7 +375,97 @@ class ModelRetrainer:
         logger.info("RETRAINING PIPELINE COMPLETED")
         logger.info("=" * 60)
         
+        # Clean uploads directory if data was consumed from there
+        if used_uploaded_data:
+            self._cleanup_uploads_dir()
+        
         return retrained_classifier, retrained_classifier.metadata
+    
+    def _find_uploaded_audio_files(self) -> List[Path]:
+        """
+        Find audio files inside the uploads directory.
+        """
+        if not self.uploads_dir.exists():
+            return []
+        
+        allowed_extensions = ('.wav', '.mp3', '.flac', '.m4a', '.ogg')
+        audio_files: List[Path] = []
+        
+        for ext in allowed_extensions:
+            audio_files.extend(self.uploads_dir.rglob(f"*{ext}"))
+        
+        audio_files = [path for path in audio_files if path.is_file()]
+        audio_files.sort()
+        
+        return audio_files
+    
+    def _infer_label_from_audio_path(self, audio_path: Path) -> str:
+        """
+        Infer the genre label from an audio file path.
+        """
+        uploads_root = self.uploads_dir.resolve()
+        audio_path = audio_path.resolve()
+        
+        label_candidate: Optional[str] = None
+        try:
+            relative_parts = audio_path.relative_to(uploads_root).parts
+            if len(relative_parts) > 1:
+                label_candidate = relative_parts[0]
+        except ValueError:
+            # File not under uploads directory
+            pass
+        
+        if not label_candidate:
+            stem = audio_path.stem
+            label_candidate = stem.split('.')[0] if '.' in stem else stem
+        
+        label_candidate = label_candidate.strip().lower()
+        if not label_candidate:
+            raise ValueError(f"Unable to infer label from filename: {audio_path.name}")
+        
+        return label_candidate
+    
+    def _build_dataframe_from_audio_uploads(self, audio_files: List[Path]) -> pd.DataFrame:
+        """
+        Convert uploaded audio files into a labeled feature DataFrame.
+        """
+        extractor = FeatureExtractor()
+        features_df = extractor.extract_features_batch([str(path) for path in audio_files])
+        
+        if features_df.empty:
+            raise ValueError("Failed to extract features from uploaded audio files")
+        
+        label_map = {
+            path.name: self._infer_label_from_audio_path(path)
+            for path in audio_files
+        }
+        
+        features_df['label'] = features_df['filename'].map(label_map)
+        if features_df['label'].isna().any():
+            missing = features_df.loc[features_df['label'].isna(), 'filename'].tolist()
+            raise ValueError(f"Could not determine labels for files: {missing}")
+        
+        return features_df
+    
+    def _cleanup_uploads_dir(self) -> None:
+        """
+        Remove all files from the uploads directory after they are consumed.
+        """
+        logger.info("Cleaning up uploads directory now that data has been consumed")
+        
+        if not self.uploads_dir.exists():
+            return
+        
+        for path in self.uploads_dir.iterdir():
+            try:
+                if path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    shutil.rmtree(path)
+            except Exception as exc:
+                logger.warning(f"Failed to delete {path}: {exc}")
+        
+        logger.info("Uploads directory cleaned")
     
     def _save_training_history(self, old_version: Optional[str], new_version: str,
                               existing_metadata: Dict, new_metadata: Dict,

@@ -92,7 +92,6 @@ poetry.lock
 
 # Misc
 *.env
-*.pkl
 *.sqlite3
 
 
@@ -101,3 +100,4 @@ FEATURES_EXTRACTION.md
 ./report
 report
 generate_report.py
+*.DS_Store

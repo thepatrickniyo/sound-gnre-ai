@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.encoders import jsonable_encoder
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -105,10 +106,10 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handle HTTP exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
-        content=ErrorResponse(
+        content=jsonable_encoder(ErrorResponse(
             error=exc.detail,
             detail=f"HTTP {exc.status_code} error"
-        ).dict()
+        ))
     )
 
 
@@ -117,10 +118,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """Handle validation errors."""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=ErrorResponse(
+        content=jsonable_encoder(ErrorResponse(
             error="Validation Error",
             detail=str(exc.errors())
-        ).dict()
+        ))
     )
 
 
@@ -130,10 +131,10 @@ async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=ErrorResponse(
+        content=jsonable_encoder(ErrorResponse(
             error="Internal Server Error",
             detail=str(exc)
-        ).dict()
+        ))
     )
 
 

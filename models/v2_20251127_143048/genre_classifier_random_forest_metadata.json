@@ -1,0 +1,16 @@
+{
+  "model_type": "random_forest",
+  "training_date": "2025-11-27T14:30:48.898828",
+  "train_accuracy": 1.0,
+  "cv_mean": 0.6626506024096386,
+  "cv_std": 0.034077435237905886,
+  "n_samples": 415,
+  "n_features": 57,
+  "n_classes": 10,
+  "test_accuracy": 0.6770186335403726,
+  "test_precision": 0.7014157121458623,
+  "test_recall": 0.6770186335403726,
+  "test_f1": 0.6797439398323166,
+  "version": "v2_20251127_143048",
+  "model_path": "models/v2_20251127_143048/genre_classifier_random_forest.pkl"
+}
